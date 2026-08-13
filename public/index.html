@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DASHBOARD ENGINE - PLTD SUPPA</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-title">
+      <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="8" width="16" height="12" rx="2"/>
+        <path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        <path d="M12 12v4"/>
+        <path d="M10 14h4"/>
+      </svg>
+      <div>
+        <h1>DASHBOARD ENGINE</h1>
+        <span class="subtitle">PLTD Suppa &mdash; Engine Monitoring</span>
+      </div>
+    </div>
+    <div class="status-bar">
+      <span id="mqtt-status" class="status-badge disconnected">
+        <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M5 12.5a10 10 0 0 1 14 0"/>
+          <path d="M8.5 16a5 5 0 0 1 7 0"/>
+          <circle cx="12" cy="19.5" r="1" fill="currentColor"/>
+        </svg>
+        <span id="mqtt-status-text">MQTT: Terputus</span>
+      </span>
+    </div>
+  </header>
+
+  <main id="dashboard" class="grid"></main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
