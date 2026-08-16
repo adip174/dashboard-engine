@@ -1,0 +1,17 @@
+{
+  "appId": "com.pltdsuppa.dashboard",
+  "appName": "Dashboard Engine Suppa",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "cleartext": true,
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon_config_sample",
+      "iconColor": "#0284C7",
+      "sound": "beep.wav"
+    }
+  }
+}

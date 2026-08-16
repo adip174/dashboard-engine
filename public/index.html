@@ -2,39 +2,468 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DASHBOARD ENGINE - PLTD SUPPA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="description" content="Dashboard Monitoring Realtime PLTD Suppa - Telemetri DG-SET 1 s/d 6" />
+  <title>Dashboard Realtime Engine - PLTD Suppa</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
 </head>
 <body>
-  <header>
-    <div class="header-title">
-      <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="4" y="8" width="16" height="12" rx="2"/>
-        <path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-        <path d="M12 12v4"/>
-        <path d="M10 14h4"/>
-      </svg>
+  <!-- Header Aplikasi -->
+  <header class="app-header">
+    <div class="header-left">
       <div>
         <h1>DASHBOARD ENGINE</h1>
-        <span class="subtitle">PLTD Suppa &mdash; Engine Monitoring</span>
+        <span class="subtitle">PLTD SUPPA 6 x 10,3 MW</span>
       </div>
     </div>
-    <div class="status-bar">
-      <span id="mqtt-status" class="status-badge disconnected">
-        <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M5 12.5a10 10 0 0 1 14 0"/>
-          <path d="M8.5 16a5 5 0 0 1 7 0"/>
-          <circle cx="12" cy="19.5" r="1" fill="currentColor"/>
-        </svg>
-        <span id="mqtt-status-text">MQTT: Terputus</span>
-      </span>
+
+    <div class="header-actions">
+      <!-- Status Badges -->
+      <div class="status-group">
+        <span id="backend-status" class="status-badge connecting" title="Status Koneksi Server Backend">
+          <span class="status-dot"></span>
+          <span id="backend-status-text">Server: Menghubungkan...</span>
+        </span>
+        <span id="mqtt-status" class="status-badge disconnected" title="Status Koneksi MQTT Broker">
+          <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M5 12.5a10 10 0 0 1 14 0"/>
+            <path d="M8.5 16a5 5 0 0 1 7 0"/>
+            <circle cx="12" cy="19.5" r="1" fill="currentColor"/>
+          </svg>
+          <span id="mqtt-status-text">MQTT: Terputus</span>
+        </span>
+      </div>
     </div>
   </header>
 
-  <main id="dashboard" class="grid"></main>
+  <!-- Segmented Page Switcher (Main Parameter vs System Parameter) -->
+  <div class="page-switcher-bar">
+    <div class="page-switcher">
+      <button class="page-tab-btn active" id="btn-tab-main-page" data-page="page-main">
+        <span class="tab-icon">⚡</span>
+        <span class="tab-text">Main Parameter</span>
+      </button>
+      <button class="page-tab-btn" id="btn-tab-system-page" data-page="page-system">
+        <span class="tab-icon">🎛️</span>
+        <span class="tab-text">System Parameter</span>
+      </button>
+    </div>
+  </div>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <!-- Alarm Banner (Tampil saat ada parameter kritis/warning pada unit Running) -->
+  <div id="alarm-banner" class="alarm-banner hidden">
+    <div class="alarm-banner-content">
+      <span class="alarm-banner-icon">⚠️</span>
+      <span id="alarm-banner-text">Peringatan: Terdapat parameter melebihi ambang batas aman!</span>
+    </div>
+    <button id="btn-view-alarm-details" class="btn-banner-action">Lihat Detail</button>
+  </div>
+
+  <!-- Page 1: Main Parameter Grid (DG-SET #1 s/d DG-SET #6) -->
+  <main id="page-main" class="page-view active grid"></main>
+
+  <!-- Page 2: System Parameter Grid (DG-SET #1 s/d DG-SET #6) -->
+  <main id="page-system" class="page-view hidden grid"></main>
+
+  <!-- ==================== BOTTOM NAVIGATION BAR (Mobile Menu) ==================== -->
+  <nav class="bottom-nav">
+    <button id="btn-admin-auth" class="nav-item" title="Login / Logout Admin">
+      <span id="admin-auth-icon" class="nav-icon">
+        <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      </span>
+      <span id="admin-auth-text" class="nav-label">Admin</span>
+    </button>
+
+    <button id="btn-audio-toggle" class="nav-item" title="Toggle Suara Alarm">
+      <span class="nav-icon">
+        <svg id="icon-sound-on" class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+        <svg id="icon-sound-off" class="btn-svg hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <line x1="23" y1="9" x2="17" y2="15"/>
+          <line x1="17" y1="9" x2="23" y2="15"/>
+        </svg>
+      </span>
+      <span class="nav-label" id="sound-nav-label">Suara</span>
+    </button>
+
+    <button id="btn-open-alarms" class="nav-item btn-has-badge" title="Riwayat & Peringatan Alarm">
+      <span class="nav-icon">
+        <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span id="alarm-badge-count" class="badge-counter hidden">0</span>
+      </span>
+      <span class="nav-label">Alarm</span>
+    </button>
+
+    <button id="btn-open-thresholds" class="nav-item" title="Pengaturan Ambang Batas Parameter & Status Engine">
+      <span class="nav-icon">
+        <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+          <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+          <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+        </svg>
+      </span>
+      <span class="nav-label">Batas Ambang</span>
+    </button>
+
+    <button id="btn-open-settings" class="nav-item" title="Pengaturan Server & MQTT">
+      <span class="nav-icon">
+        <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </span>
+      <span class="nav-label">Koneksi</span>
+    </button>
+  </nav>
+
+  <!-- ==================== MODAL: LOGIN ADMIN ==================== -->
+  <div id="modal-admin-login" class="modal-backdrop hidden">
+    <div class="modal-container modal-sm">
+      <div class="modal-header">
+        <h2>🔐 Login Administrator</h2>
+        <button class="modal-close" id="btn-close-admin-login">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="section-desc">Hanya role <strong>Admin</strong> yang dapat mengubah status unit operasional dan pengaturan batas ambang alarm.</p>
+        <div class="form-group">
+          <label for="input-admin-user">Username</label>
+          <input type="text" id="input-admin-user" value="admin" placeholder="Username Admin" />
+        </div>
+        <div class="form-group">
+          <label for="input-admin-pass">Password</label>
+          <input type="password" id="input-admin-pass" placeholder="Password Admin" />
+        </div>
+        <div class="btn-row">
+          <button id="btn-cancel-admin-login" class="btn btn-secondary">Batal</button>
+          <button id="btn-submit-admin-login" class="btn btn-primary">Masuk</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: PENGATURAN KONEKSI & MQTT ==================== -->
+  <div id="modal-settings" class="modal-backdrop hidden">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h2>⚙️ Pengaturan Koneksi & MQTT</h2>
+        <button class="modal-close" id="btn-close-settings">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Tab Navigation -->
+        <div class="modal-tabs">
+          <button class="tab-btn active" data-tab="tab-server">Server Backend</button>
+          <button class="tab-btn" data-tab="tab-mqtt">Broker MQTT</button>
+        </div>
+
+        <!-- Tab 1: Server Backend -->
+        <div id="tab-server" class="tab-content active">
+          <!-- Realtime Status Server -->
+          <div class="conn-status-card">
+            <div class="conn-status-row">
+              <span class="conn-status-title">Status Server Backend:</span>
+              <span id="modal-server-status-badge" class="status-badge disconnected">Terputus</span>
+            </div>
+            <div class="conn-status-endpoint" id="modal-server-endpoint">URL: --</div>
+          </div>
+
+          <div class="form-group">
+            <label for="input-backend-url">URL Backend Server</label>
+            <input type="text" id="input-backend-url" placeholder="Contoh: http://192.168.1.15:3000 atau https://backend.railway.app" />
+            <span class="help-text">
+              <strong>Tips:</strong> Gunakan IP Wi-Fi laptop (misal <code>http://192.168.x.x:3000</code>) atau URL hosting cloud Anda (Railway/Render).
+            </span>
+          </div>
+          <div class="btn-row">
+            <button id="btn-reset-backend" class="btn btn-secondary">Reset Default</button>
+            <button id="btn-save-backend" class="btn btn-primary btn-action-main">🔌 Sambungkan ke Server</button>
+          </div>
+        </div>
+
+        <!-- Tab 2: Broker MQTT -->
+        <div id="tab-mqtt" class="tab-content">
+          <!-- Realtime Status MQTT -->
+          <div class="conn-status-card">
+            <div class="conn-status-row">
+              <span class="conn-status-title">Status Broker MQTT:</span>
+              <span id="modal-mqtt-status-badge" class="status-badge disconnected">Terputus</span>
+            </div>
+            <div class="conn-status-endpoint" id="modal-mqtt-endpoint">Broker: --</div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group flex-2">
+              <label for="input-mqtt-url">Host / URL Broker</label>
+              <input type="text" id="input-mqtt-url" placeholder="mqtt-cleen.ptpjb.com atau mqtt://..." />
+            </div>
+            <div class="form-group flex-1">
+              <label for="input-mqtt-port">Port</label>
+              <input type="number" id="input-mqtt-port" placeholder="1883" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="input-mqtt-user">Username (Opsional)</label>
+              <input type="text" id="input-mqtt-user" placeholder="Username MQTT" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="input-mqtt-pass">Password (Opsional)</label>
+              <input type="password" id="input-mqtt-pass" placeholder="Biarkan kosong jika tidak berubah" autocomplete="new-password" />
+            </div>
+          </div>
+          <div class="btn-row">
+            <button id="btn-save-mqtt" class="btn btn-primary btn-action-main">🔌 Hubungkan & Tes MQTT</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: PENGATURAN AMBANG BATAS & STATUS ENGINE ==================== -->
+  <div id="modal-thresholds" class="modal-backdrop hidden">
+    <div class="modal-container modal-lg">
+      <div class="modal-header">
+        <h2>🔔 Pengaturan Engine & Batas Ambang</h2>
+        <button class="modal-close" id="btn-close-thresholds">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="admin-threshold-lock-notice" class="admin-notice hidden">
+          🔒 <span>Anda belum login sebagai Admin. Pengaturan hanya dapat dilihat (read-only).</span>
+        </div>
+
+        <div class="notification-settings-box">
+          <h3>Opsi Pemberitahuan Alarm</h3>
+          <div class="switch-row">
+            <label class="switch-label" for="switch-sound">
+              <span>Bunyi Alarm (Audio Alert)</span>
+              <small>Membunyikan nada peringatan saat parameter kritis</small>
+            </label>
+            <input type="checkbox" id="switch-sound" class="toggle-switch" checked />
+          </div>
+          <div class="switch-row">
+            <label class="switch-label" for="switch-push">
+              <span>Notifikasi Push / Popup HP</span>
+              <small>Notifikasi lokal Capacitor / Web Push</small>
+            </label>
+            <input type="checkbox" id="switch-push" class="toggle-switch" checked />
+          </div>
+        </div>
+
+        <!-- Threshold & Engine Category Tabs -->
+        <div class="modal-tabs">
+          <button class="tab-btn active" data-tab="tab-th-engine">⚙️ Status Engine</button>
+          <button class="tab-btn" data-tab="tab-th-main">⚡ Main Parameter</button>
+          <button class="tab-btn" data-tab="tab-th-press">💧 Pressure (Min)</button>
+          <button class="tab-btn" data-tab="tab-th-temp">🌡️ Temperature (Max)</button>
+        </div>
+
+        <!-- Section 0: Status Operasional Engine (DG-SET 1 - 6) -->
+        <div id="tab-th-engine" class="tab-content active">
+          <p class="section-desc">Atur status operasional masing-masing engine. Alarm hanya aktif jika unit berada dalam status <strong>Running</strong>.</p>
+          <div class="engine-status-list" id="modal-engine-status-list">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Section 1: Main Parameters -->
+        <div id="tab-th-main" class="tab-content">
+          <p class="section-desc">Batas ambang parameter utama listrik & putaran mesin.</p>
+          <div class="threshold-cards-grid">
+            <!-- Active Power -->
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">⚡ Active Power (kW)</span></div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Min Aman (kW)</label>
+                  <input type="number" step="any" id="th-active-power-min" value="-200" />
+                </div>
+                <div class="form-group">
+                  <label>Max Aman (kW)</label>
+                  <input type="number" step="any" id="th-active-power-max" value="1200" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Reactive Power -->
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">〰️ Reactive Power (kVAR)</span></div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Min Aman (kVAR)</label>
+                  <input type="number" step="any" id="th-reactive-power-min" value="-200" />
+                </div>
+                <div class="form-group">
+                  <label>Max Aman (kVAR)</label>
+                  <input type="number" step="any" id="th-reactive-power-max" value="1000" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Generator Current -->
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">📈 Generator Current (A)</span></div>
+              <div class="form-group">
+                <label>Batas Maksimum Aman (A)</label>
+                <input type="number" step="any" id="th-current-max" value="1800" />
+              </div>
+            </div>
+
+            <!-- Engine Speed -->
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">⏱️ Engine Speed (RPM)</span></div>
+              <div class="form-group">
+                <label>Batas Maksimum Aman (RPM)</label>
+                <input type="number" step="any" id="th-speed-max" value="510" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: System Pressure (Batas MIN Aman) -->
+        <div id="tab-th-press" class="tab-content">
+          <p class="section-desc">Batas <strong>MINIMUM</strong> aman untuk tekanan fluida (Alarm aktif jika nilai &lt; Min).</p>
+          <div class="threshold-cards-grid">
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">🛢️ Fuel Oil Inlet Press (101PT)</span></div>
+              <div class="form-group">
+                <label>Batas Minimum Aman (bar)</label>
+                <input type="number" step="0.01" id="th-sys-fo-press" value="4.50" />
+              </div>
+            </div>
+
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">🛢️ Lube Oil Inlet Press (201PT)</span></div>
+              <div class="form-group">
+                <label>Batas Minimum Aman (bar)</label>
+                <input type="number" step="0.01" id="th-sys-lo-press" value="3.50" />
+              </div>
+            </div>
+
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">💧 HT-Water Inlet Press (401PT)</span></div>
+              <div class="form-group">
+                <label>Batas Minimum Aman (bar)</label>
+                <input type="number" step="0.01" id="th-sys-ht-press" value="2.00" />
+              </div>
+            </div>
+
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">💧 LT-Water Inlet Press (451PT)</span></div>
+              <div class="form-group">
+                <label>Batas Minimum Aman (bar)</label>
+                <input type="number" step="0.01" id="th-sys-lt-press" value="2.00" />
+              </div>
+            </div>
+
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">💨 Starting Air Press (301PT)</span></div>
+              <div class="form-group">
+                <label>Batas Minimum Aman (bar)</label>
+                <input type="number" step="0.01" id="th-sys-startair-press" value="25.00" />
+              </div>
+            </div>
+
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">🌀 Charge Air Press A (601PT_1)</span></div>
+              <div class="form-group">
+                <label>Batas Minimum Aman (bar)</label>
+                <input type="number" step="0.01" id="th-sys-chargeair-press" value="1.80" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: System Temperature (Batas MAX Aman) -->
+        <div id="tab-th-temp" class="tab-content">
+          <p class="section-desc">Batas <strong>MAKSIMUM</strong> aman untuk temperatur fluida (Alarm aktif jika nilai &gt; Max).</p>
+          <div class="threshold-cards-grid">
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">🌡️ HT Water Inlet Temp (401TE)</span></div>
+              <div class="form-group">
+                <label>Batas Maksimum Aman (°C)</label>
+                <input type="number" step="0.1" id="th-sys-ht-in-temp" value="85.0" />
+              </div>
+            </div>
+
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">🌡️ HT Water Outlet Temp (401TE)</span></div>
+              <div class="form-group">
+                <label>Batas Maksimum Aman (°C)</label>
+                <input type="number" step="0.1" id="th-sys-ht-out-temp" value="95.0" />
+              </div>
+            </div>
+
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">🌡️ Lube Oil Inlet Temp (201TE)</span></div>
+              <div class="form-group">
+                <label>Batas Maksimum Aman (°C)</label>
+                <input type="number" step="0.1" id="th-sys-lo-temp" value="75.0" />
+              </div>
+            </div>
+
+            <div class="threshold-card">
+              <div class="threshold-header"><span class="threshold-title">🌡️ Fuel Oil Inlet Temp (101TE)</span></div>
+              <div class="form-group">
+                <label>Batas Maksimum Aman (°C)</label>
+                <input type="number" step="0.1" id="th-sys-fo-temp" value="120.0" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button id="btn-reset-thresholds" class="btn btn-secondary">Reset Default</button>
+          <button id="btn-save-thresholds" class="btn btn-primary">Simpan Pengaturan</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: DAFTAR ALARM & RIWAYAT ==================== -->
+  <div id="modal-alarms" class="modal-backdrop hidden">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h2>⚠️ Riwayat & Peringatan Alarm Aktif</h2>
+        <button class="modal-close" id="btn-close-alarms">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="alarm-tabs">
+          <button class="alarm-tab-btn active" id="btn-tab-active-alarms">Alarm Aktif</button>
+          <button class="alarm-tab-btn" id="btn-tab-alarm-logs">Log Riwayat</button>
+          <button id="btn-clear-logs" class="btn btn-sm btn-outline-danger" style="margin-left: auto;">Hapus Riwayat</button>
+        </div>
+
+        <div id="alarm-list-container" class="alarm-log-list">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Socket.io Client CDN + Local fallback script -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    if (typeof io === 'undefined') {
+      document.write('<script src="/socket.io/socket.io.js"><\/script>');
+    }
+  </script>
   <script src="app.js"></script>
 </body>
 </html>

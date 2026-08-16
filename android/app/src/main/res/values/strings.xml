@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Dashboard Engine Suppa</string>
+    <string name="title_activity_main">Dashboard Engine Suppa</string>
+    <string name="package_name">com.pltdsuppa.dashboard</string>
+    <string name="custom_url_scheme">com.pltdsuppa.dashboard</string>
+</resources>
