@@ -7,6 +7,23 @@ Dashboard real-time modern untuk memantau parameter engine pembangkit (DG-SET #1
 
 ---
 
+## 🚨 Setup Wajib: MQTT Bridge ke Cloud
+
+Broker internal `mqtt-cleen.ptpjb.com:1883` **tidak bisa diakses langsung dari internet/cloud** (Railway diblokir firewall). 
+
+Solusi: Gunakan **Node-RED Bridge** di PC kantor untuk forward data ke HiveMQ Cloud.
+
+📖 **Panduan lengkap**: [`NODE_RED_BRIDGE_GUIDE.md`](./NODE_RED_BRIDGE_GUIDE.md)
+
+**Quick summary:**
+1. Setup HiveMQ Cloud → dapatkan host/port/credentials
+2. Install Node-RED di PC kantor
+3. Import flow `nodered-bridge-flow.json`
+4. Update Railway `.env` → `mqtts://<hivemq-host>:8883`
+5. Live data streaming ke dashboard!
+
+---
+
 ## Fitur Utama
 
 - **Realtime Telemetry DG-SET**: Pemantauan langsung untuk Active Power (kW), Reactive Power (kVAR), Generator Current (A), dan Engine Speed (RPM).

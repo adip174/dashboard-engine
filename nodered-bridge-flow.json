@@ -1,0 +1,126 @@
+# Node-RED Flow untuk MQTT Bridge: PJB -> HiveMQ Cloud
+# Cara pakai: Import file ini ke Node-RED di PC kantor
+# Menu: Import → Choose file → paste JSON ini → Import
+
+[
+  {
+    "id": "pjb-to-hivemq-bridge",
+    "type": "tab",
+    "label": "Bridge PJB to HiveMQ",
+    "disabled": false,
+    "info": ""
+  },
+  {
+    "id": "mqtt-in-pjb",
+    "type": "mqtt in",
+    "z": "pjb-to-hivemq-bridge",
+    "name": "Broker PJB",
+    "topic": "KPPJBS/PLTD_Suppa/#",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "broker-pjb",
+    "inputs": 1,
+    "outputs": 1,
+    "x": 110,
+    "y": 100,
+    "wires": [
+      ["mqtt-out-hivemq", "debug-incoming"]
+    ]
+  },
+  {
+    "id": "mqtt-out-hivemq",
+    "type": "mqtt out",
+    "z": "pjb-to-hivemq-bridge",
+    "name": "HiveMQ Cloud",
+    "topic": "",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "hivemq-cloud",
+    "x": 340,
+    "y": 100,
+    "wires": [
+      ["debug-forwarded"]
+    ]
+  },
+  {
+    "id": "debug-incoming",
+    "type": "debug",
+    "z": "pjb-to-hivemq-bridge",
+    "name": "Status Panel",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "statusVal": "payload",
+    "statusType": "auto",
+    "x": 340,
+    "y": 140,
+    "wires": []
+  },
+  {
+    "id": "debug-forwarded",
+    "type": "debug",
+    "z": "pjb-to-hivemq-bridge",
+    "name": "Forwarded to HiveMQ",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "statusVal": "payload",
+    "statusType": "auto",
+    "x": 340,
+    "y": 180,
+    "wires": []
+  },
+  {
+    "id": "broker-pjb",
+    "type": "mqtt-broker",
+    "z": "",
+    "name": "Broker PJB",
+    "broker": "mqtt-cleen.ptpjb.com",
+    "port": "1883",
+    "clientid": "nodered-bridge-" + Math.floor(Math.random() * 1000000),
+    "username": "bbtk",
+    "password": "ebtbbtk@PJB",
+    "autoConnect": true,
+    "cleanSession": true,
+    "protocolVersion": "3.1.1",
+    "keepalive": "60",
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthPayload": "",
+    "closeTopic": "",
+    "closePayload": "",
+    "willTopic": "",
+    "willQos": "0",
+    "willPayload": ""
+  },
+  {
+    "id": "hivemq-cloud",
+    "type": "mqtt-broker",
+    "z": "",
+    "name": "HiveMQ Cloud",
+    "broker": "xxx.s1.eu.hivemq.cloud",
+    "port": "8883",
+    "clientid": "nodered-hivemq-" + Math.floor(Math.random() * 1000000),
+    "username": "railway-dashboard",
+    "password": "password-yang-anda-buat",
+    "autoConnect": true,
+    "cleanSession": true,
+    "protocolVersion": "3.1.1",
+    "keepalive": "60",
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthPayload": "",
+    "closeTopic": "",
+    "closePayload": "",
+    "willTopic": "",
+    "willQos": "0",
+    "willPayload": ""
+  }
+]
