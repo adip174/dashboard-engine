@@ -76,6 +76,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 let client = null;
 let mqttConnected = false;
 let mqttLastError = null;
+let dropStats = { unrecognized: 0, unmatchedUnit: 0, total: 0, recognized: 0 };
+const seenParams = new Set();
 
 function broadcastStatus(status, errorMsg = null) {
   mqttConnected = status;
@@ -281,6 +283,7 @@ function initMqttClient() {
     });
 
     client.on('message', (topic, message) => {
+      dropStats.total++;
       console.log(`[MQTT DEBUG] Topic: ${topic}, Message: ${message.toString().substring(0, 50)}...`);
       // Format: [Prefix]/PLTD_Suppa/UnitX/Parameter
       const parts = topic.split('/');
@@ -310,11 +313,32 @@ function initMqttClient() {
       }
 
       const unitMatch = rawUnit.match(/unit\s*([1-6])/i);
-      if (!unitMatch) return;
+      if (!unitMatch) {
+        dropStats.unmatchedUnit++;
+        console.log(`[MQTT DROP] Unit not matched: "${rawUnit}" | Topic: ${topic}`);
+        return;
+      }
       const unit = 'Unit' + unitMatch[1];
 
       const normalizedParam = findNormalizedParam(rawParam);
-      if (!normalizedParam) return;
+      if (!normalizedParam) {
+        dropStats.unrecognized++;
+        // Katalog: log semua param unik yang tidak dikenali (dedup via Set)
+        const key = rawParam.toLowerCase();
+        if (!seenParams.has(key)) {
+          seenParams.add(key);
+          console.log(`[MQTT CATALOG] NEW param: "${rawParam}" | Topic: ${topic} | Value: ${message.toString()}`);
+        } else {
+          console.log(`[MQTT DROP] Unrecognized param: "${rawParam}" | Topic: ${topic}`);
+        }
+        // Ringkasan berkala tiap 100 pesan
+        if (dropStats.total % 100 === 0) {
+          console.log(`[MQTT STATS] Total: ${dropStats.total} | Recognized: ${dropStats.recognized} | Dropped (unrecognized): ${dropStats.unrecognized} | Dropped (unit): ${dropStats.unmatchedUnit} | Unique params seen: ${seenParams.size}`);
+        }
+        return;
+      }
+
+      dropStats.recognized++;
 
       const meta = PARAM_META[normalizedParam];
       const raw = message.toString().trim();
