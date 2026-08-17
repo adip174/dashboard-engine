@@ -144,6 +144,29 @@ function findNormalizedParam(rawParam) {
   return null;
 }
 
+function formatBrokerUrl(rawUrl, defaultPort = 1883) {
+  if (!rawUrl) return `mqtt://localhost:${defaultPort}`;
+  let clean = rawUrl.trim().replace(/\/+$/, '');
+
+  let protocol = 'mqtt://';
+  const matchProto = clean.match(/^([a-zA-Z0-9]+:\/\/)/);
+  if (matchProto) {
+    protocol = matchProto[1];
+    clean = clean.replace(matchProto[1], '');
+  }
+
+  let host = clean;
+  let port = defaultPort;
+
+  const portMatch = clean.match(/:(\d+)$/);
+  if (portMatch) {
+    port = parseInt(portMatch[1], 10);
+    host = clean.replace(/:(\d+)$/, '');
+  }
+
+  return `${protocol}${host}:${port}`;
+}
+
 function initMqttClient() {
   if (client) {
     try {
@@ -154,20 +177,33 @@ function initMqttClient() {
     }
   }
 
-  const brokerUrl = `${mqttConfig.url.startsWith('mqtt://') || mqttConfig.url.startsWith('mqtts://') || mqttConfig.url.startsWith('ws://') || mqttConfig.url.startsWith('wss://') ? mqttConfig.url : `mqtt://${mqttConfig.url}`}:${mqttConfig.port}`;
+  const brokerUrl = formatBrokerUrl(mqttConfig.url, mqttConfig.port || 1883);
+  
+  // Force IPv4 untuk kompatibilitas dengan Railway (beberapa broker hanya listen di IPv4)
+  const options = {
+    username: mqttConfig.username || undefined,
+    password: mqttConfig.password || undefined,
+    reconnectPeriod: 2000,          // Reconnect lebih cepat
+    connectTimeout: 30000,          // Timeout 30 detik untuk jaringan lambat
+    cleanSession: true,
+    keepalive: 60,                  // Keepalive setiap 60 detik
+    reschedulePings: false,         // Gunakan default pinging
+    protocolId: 'MQTT',
+    protocolVersion: 4,             // MQTT 3.1.1
+    family: 4                       // ⭐️ FORCE IPv4 ONLY (fixes Railway DNS issue)
+  };
 
-  console.log(`[MQTT] Menghubungkan ke ${brokerUrl} (User: ${mqttConfig.username || 'Anonymous'})...`);
+  console.log(`[MQTT] Menghubungkan ke ${brokerUrl}`);
+  console.log(`[MQTT] Options: Username=${mqttConfig.username || 'Anonymous'}, IPv4 only=${options.family === 4}, Timeout=${options.connectTimeout}ms`);
+  if (mqttConfig.password) {
+    console.log(`[MQTT] Password akan digunakan untuk autentikasi`);
+  }
 
   try {
-    client = mqtt.connect(brokerUrl, {
-      username: mqttConfig.username || undefined,
-      password: mqttConfig.password || undefined,
-      reconnectPeriod: 5000,
-      connectTimeout: 10000,
-    });
+    client = mqtt.connect(brokerUrl, options);
 
     client.on('connect', () => {
-      console.log(`[MQTT] Terhubung ke ${brokerUrl}`);
+      console.log(`[MQTT] Berhasil terhubung ke ${brokerUrl}`);
       broadcastStatus(true);
       
       const allSubscriptions = new Set(mqttConfig.topics.map(t => t.trim()));
@@ -193,17 +229,52 @@ function initMqttClient() {
     });
 
     client.on('reconnect', () => {
-      console.log('[MQTT] Mencoba koneksi ulang...');
+      console.log('[MQTT] Mencoba koneksi ulang ke broker...');
+    });
+
+    client.on('offline', () => {
+      console.log('[MQTT] Broker offline (network disconnected)');
+      broadcastStatus(false, 'Broker offline');
     });
 
     client.on('close', () => {
-      console.log('[MQTT] Koneksi terputus');
+      console.log('[MQTT] Koneksi broker terputus');
       broadcastStatus(false);
     });
 
     client.on('error', (err) => {
-      console.error('[MQTT] Error:', err.message);
-      broadcastStatus(false, err.message);
+      // Log detail error ke console Railway
+      console.error('[MQTT] ========== ERROR DETAIL ==========');
+      console.error('[MQTT] Error code:', err.code || 'N/A');
+      console.error('[MQTT] Error errno:', err.errno || 'N/A');
+      console.error('[MQTT] Error message:', err.message);
+      console.error('[MQTT] Error stack:', err.stack ? err.stack.split('\n')[0] : 'N/A');
+      console.error('[MQTT] ================================');
+      
+      let userFriendlyError = err.message;
+      let diagnosis = '';
+      
+      if (err.code === 'ENOTFOUND') {
+        userFriendlyError = `Domain broker tidak dapat dijangkau oleh server (DNS ENOTFOUND).`;
+        diagnosis = `DNS resolution gagal. Kemungkinan: (1) nama host salah, (2) broker tidak accessible dari public internet, (3) DNS server issue.`;
+      } else if (err.code === 'ECONNREFUSED') {
+        userFriendlyError = `Koneksi ditolak oleh broker pada port ${mqttConfig.port || 1883} (ECONNREFUSED).`;
+        diagnosis = `Broker tidak listening di IP:port tersebut, atau firewall memblokir koneksi.`;
+      } else if (err.code === 'ETIMEDOUT' || err.code === 'EHOSTUNREACH') {
+        userFriendlyError = `Koneksi timeout ke broker (${mqttConfig.url}:${mqttConfig.port}).`;
+        diagnosis = `Jaringan tidak dapat mencapai broker. Kemungkinan firewall, whitelist IP, atau broker hanya accessible dari jaringan internal.`;
+      } else if (err.message.includes('Not authorized')) {
+        userFriendlyError = `Autentikasi MQTT gagal (username/password salah).`;
+        diagnosis = `Pastikan MQTT_USERNAME dan MQTT_PASSWORD di Railway sesuai dengan broker.`;
+      } else if (err.message.includes('getaddrinfo')) {
+        userFriendlyError = `Gagal resolve DNS untuk ${mqttConfig.url}.`;
+        diagnosis = `DNS lookup gagal. Coba gunakan IP address langsung atau pastikan DNS server accessible.`;
+      } else {
+        diagnosis = `Error tidak dikenali. Periksa log Railway untuk detail lengkap.`;
+      }
+      
+      console.log(`[MQTT] Diagnosis: ${diagnosis}`);
+      broadcastStatus(false, userFriendlyError);
     });
 
     client.on('message', (topic, message) => {

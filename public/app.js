@@ -835,12 +835,12 @@ function setBackendStatus(status, text) {
   }
 }
 
-function setMqttStatus(connected, broker) {
+function setMqttStatus(connected, broker, error = null) {
   const badge = document.getElementById('mqtt-status');
   const text = document.getElementById('mqtt-status-text');
   if (badge) badge.className = 'status-badge ' + (connected ? 'connected' : 'disconnected');
   if (text) text.textContent = connected ? 'MQTT: Terhubung' : 'MQTT: Terputus';
-  if (broker && badge) badge.title = `Broker: ${broker}`;
+  if (broker && badge) badge.title = `Broker: ${broker}${error ? ` (${error})` : ''}`;
 
   // Modal MQTT status
   const modalBadge = document.getElementById('modal-mqtt-status-badge');
@@ -850,7 +850,11 @@ function setMqttStatus(connected, broker) {
     modalBadge.textContent = connected ? 'Terhubung' : 'Terputus';
   }
   if (modalEndpoint) {
-    modalEndpoint.textContent = broker ? `Broker: ${broker}` : `Broker: ${serverMqttConfig.url}:${serverMqttConfig.port}`;
+    if (error && !connected) {
+      modalEndpoint.innerHTML = `Broker: ${broker || serverMqttConfig.url}<br><span style="color:#f87171;font-size:0.75rem;display:block;margin-top:3px;">⚠️ ${error}</span>`;
+    } else {
+      modalEndpoint.textContent = broker ? `Broker: ${broker}` : `Broker: ${serverMqttConfig.url}:${serverMqttConfig.port}`;
+    }
   }
 }
 
@@ -910,7 +914,12 @@ function initSocketConnection() {
       if (typeof statusObj === 'boolean') {
         setMqttStatus(statusObj);
       } else {
-        setMqttStatus(statusObj.connected, statusObj.broker);
+        setMqttStatus(statusObj.connected, statusObj.broker, statusObj.error);
+        if (!statusObj.connected && statusObj.error) {
+          showToast(`MQTT: ${statusObj.error}`, 'error');
+        } else if (statusObj.connected) {
+          showToast(`MQTT: Berhasil terhubung ke broker! 🟢`, 'success');
+        }
       }
     });
 
