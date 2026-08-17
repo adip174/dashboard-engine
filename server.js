@@ -263,6 +263,9 @@ function initMqttClient() {
       } else if (err.code === 'ETIMEDOUT' || err.code === 'EHOSTUNREACH') {
         userFriendlyError = `Koneksi timeout ke broker (${mqttConfig.url}:${mqttConfig.port}).`;
         diagnosis = `Jaringan tidak dapat mencapai broker. Kemungkinan firewall, whitelist IP, atau broker hanya accessible dari jaringan internal.`;
+      } else if (err.message.includes('connack timeout')) {
+        userFriendlyError = `Broker tidak merespon handshake MQTT (connack timeout). TCP terhubung tapi broker diam — kemungkinan firewall memfilter IP Railway.`;
+        diagnosis = `TCP connect berhasil tapi broker tidak mengirim CONNACK. Pola khas firewall/DPI yang memblokir berdasarkan IP sumber, atau broker hanya melayani jaringan internal. Jalankan 'node diagnose-mqtt.js' di Railway shell untuk konfirmasi.`;
       } else if (err.message.includes('Not authorized')) {
         userFriendlyError = `Autentikasi MQTT gagal (username/password salah).`;
         diagnosis = `Pastikan MQTT_USERNAME dan MQTT_PASSWORD di Railway sesuai dengan broker.`;
