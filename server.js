@@ -281,6 +281,7 @@ function initMqttClient() {
     });
 
     client.on('message', (topic, message) => {
+      console.log(`[MQTT DEBUG] Topic: ${topic}, Message: ${message.toString().substring(0, 50)}...`);
       // Format: [Prefix]/PLTD_Suppa/UnitX/Parameter
       const parts = topic.split('/');
       if (parts.length < 3) return;
@@ -340,6 +341,7 @@ function initMqttClient() {
 
       console.log(`[MQTT RECV] ${unit} | ${normalizedParam} = ${value} (Topic: ${topic})`);
       io.emit('data', { unit, parameter: normalizedParam, ...entry });
+      console.log(`[Socket] Emitted data: ${unit}/${normalizedParam}`);
     });
   } catch (err) {
     console.error('[MQTT] Gagal inisialisasi client MQTT:', err.message);

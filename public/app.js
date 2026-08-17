@@ -22,7 +22,8 @@ function getInitialBackendUrl() {
   if (saved) return saved;
 
   if (isCapacitor) {
-    return 'http://192.168.1.100:3000';
+    // Default ke Railway production URL untuk APK
+    return window.location.origin.replace('localhost:3000', 'dashboard-engine-production.up.railway.app');
   }
 
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -888,11 +889,13 @@ function initSocketConnection() {
     });
 
     socket.on('init', ({ data, mqttStatus, mqttConfig }) => {
+      console.log('[Socket] Init received:', { data: Object.keys(data || {}).length + ' units', mqttStatus });
       if (mqttConfig) {
         serverMqttConfig = mqttConfig;
       }
       setMqttStatus(mqttStatus, mqttConfig ? `${mqttConfig.url}:${mqttConfig.port}` : null);
 
+      let paramCount = 0;
       for (const [unit, params] of Object.entries(data || {})) {
         if (UNITS.includes(unit)) {
           if (params.Engine_Speed && params.Engine_Speed.value !== null && params.Engine_Speed.value !== undefined) {
@@ -900,13 +903,16 @@ function initSocketConnection() {
           }
           for (const [parameter, entry] of Object.entries(params)) {
             updateValue(unit, parameter, entry.value, entry.timestamp);
+            paramCount++;
           }
         }
       }
+      console.log(`[Socket] Initialized ${paramCount} parameters`);
       UNITS.forEach(u => updateUnitStatusDisplay(u));
     });
 
     socket.on('data', ({ unit, parameter, value, timestamp }) => {
+      console.log(`[Socket] Data received: ${unit} | ${parameter} = ${value}`);
       updateValue(unit, parameter, value, timestamp);
     });
 
